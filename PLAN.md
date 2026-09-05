@@ -56,25 +56,57 @@ Three moving pieces, no persistent state:
    `scripting.executeScript` at command time, returning `window.getSelection().toString()`.
    No statically declared content script, so nothing runs on pages until the user presses the key.
 
-Flow for a single command press:
+Flow for a single command press. Foreground and background use different strategies:
 
 1. `tabs.query({active: true, currentWindow: true})` → the source tab (need `id`, `index`,
    `windowId`, `groupId`, `pinned`).
 2. Inject the selection reader into that tab (`allFrames: true`); pick the best non-empty result.
 3. If the selection is empty after normalization → do nothing, return.
-4. `tabs.create({windowId, index: source.index + 1, active: <foreground?>, openerTabId: source.id})`
-   → a blank tab already sitting in the right slot.
-5. `search.query({text: selection, tabId: newTab.id})` → the browser's **default** search engine
-   loads its results page into that specific tab.
+4. **Foreground:** register a one-shot `tabs.onCreated` listener (to catch the tab the next step
+   creates), then call `search.query({text: selection, disposition: "NEW_TAB"})`. The browser
+   creates the tab and navigates it to the results in one step, so there's no separate blank-tab
+   moment for the omnibox to get stuck on, and no perceptible delay. Once `onCreated` resolves
+   with that tab, `tabs.move(tab.id, {index: source.index + 1})` repositions it.
+5. **Background:** `tabs.create({windowId, index: source.index + 1, active: false, openerTabId:
+   source.id, url: "about:blank"})` to get a blank tab already sitting in the right slot, then
+   `search.query({text: selection, tabId: newTab.id})` to load results into it. Since the tab is
+   never shown while blank/loading, there's no artifact to worry about here, and `disposition` has
+   no background/inactive option to use instead regardless.
 6. Chrome only: if the source tab was in a tab group, `tabs.group({groupId, tabIds:[newTab.id]})`
    so the new tab joins the same group instead of visually splitting it.
 
-The reason for the create-then-query split is important: `search.query` with a `disposition` of
-`NEW_TAB` gives no control over tab index (that is exactly why the reference extension lands at
-the end of the strip). Passing an explicit `tabId` instead lets us own tab creation — and
-therefore the index and the foreground/background choice — while still deferring the actual
-search URL to the browser's default engine. `tabId` and `disposition` are mutually exclusive in
-both browsers, which is fine; we only ever pass `tabId`.
+### The trade-off this accepts, and what was tried instead
+
+`disposition: "NEW_TAB"` always **appends the tab at the end of the tab strip** — confirmed by
+testing, and unsurprising in hindsight, since that's exactly the symptom of the extension this
+project clones (which almost certainly uses this same public API). Recovering the index
+afterwards with `tabs.move()` causes a brief visible flash at the end of the strip before the tab
+jumps to its real position. Two alternatives were tried and reverted because they felt too slow
+in practice, despite being artifact-free with no positioning flash:
+
+- Create the tab inactive at the right index, wait for its navigation to reach `tabs.onUpdated`
+  status `complete`, then activate it. Correct and flash-free, but waits for the whole results
+  page to finish loading before switching — noticeably slower than the browser's own built-in
+  "search selection" feature.
+- Same, but activate as soon as the navigation *commits* (`tabs.onUpdated` firing with a real
+  `changeInfo.url`, well before `complete`) rather than waiting for full load. Faster than the
+  above, still felt too slow to be worth the trade against the `disposition` version's brief flash.
+
+Given that ordering, the flash from `disposition` + `tabs.move()` was judged the lesser problem,
+which is why it's the current implementation. If it stops feeling right in practice, the
+full-load-wait version is the fallback with the fewest moving parts (see git history / earlier
+revisions of this file for its exact shape).
+
+One correction worth recording: an earlier revision of this plan asserted that
+`disposition: "NEW_TAB"` is "the same internal path Chrome's own context-menu search item uses."
+That was **not verified** — it was inferred from the public API's behavior and stated with more
+confidence than was earned, and it doesn't actually matter for the decision above (the trade-off
+holds regardless of what Chrome's native item does internally). What's actually true and
+checkable: `chrome.search.query()` is a narrow black-box wrapper that never exposes the default
+engine's URL template to extensions, only `disposition` (no index control) or `tabId` (existing
+tab only) — Chrome's own browser code isn't bound by that restriction, but there's no way to
+confirm from outside Chromium's source whether its native menu item's code path has anything in
+common with `chrome.search.query()` beyond both using the same default engine.
 
 ---
 
@@ -158,9 +190,10 @@ Edge cases to handle explicitly:
   correct after the user moves tabs around. Revisit only if it feels wrong in daily use; if so,
   implement chaining as bounded per-source-tab state in the background script (`Map<sourceTabId,
   {lastIndex, timestamp}>`, invalidated on tab move/close and after a timeout).
-- **Foreground vs background.** `active: true` / `active: false` at `tabs.create` time.
-  `search.query` targeting an explicit `tabId` must not steal focus — verify in both browsers,
-  especially Firefox, and if it does, re-assert the source tab as active afterwards.
+- **Foreground vs background.** Different code paths per §2: foreground uses
+  `search.query({disposition: "NEW_TAB"})` (browser creates+activates it, we just reposition
+  afterwards with `tabs.move`); background creates the tab itself with `active: false` up front.
+  See §2's "The trade-off this accepts" for why they aren't unified.
 - **`openerTabId`.** Set it to the source tab. It gives correct "back to opener" behavior on
   close, and marks the tab as related. Confirm it does not itself override our index in Chrome
   (it shouldn't when `index` is explicit); if it does, drop it.
@@ -208,9 +241,11 @@ Fallbacks and checks:
 - Confirm Firefox's `search.query` accepts `tabId` on the minimum version we target; if it only
   supports `disposition` there, use Firefox's `search.search({query, tabId})` instead (Firefox-only
   API, also takes a tab id) and branch on feature detection.
-- If `search.query` rejects (no default engine, permission missing), fall back to
-  `tabs.update(newTabId, {url: "https://www.google.com/search?q=" + encodeURIComponent(text)})`
-  so the press is never a no-op with a blank tab left behind. Alternatively close the blank tab.
+- If `search.query` rejects (no default engine, permission missing), don't guess a search engine
+  to fall back to - the search API never exposes one, so there's nothing reliable to build a URL
+  from. Instead, inject a plain `alert()` into the (blank) tab via `scripting.executeScript`
+  telling the user the search couldn't run and why. This needs no extra permission: it's a tab we
+  created ourselves, never a restricted page.
 - **Stretch (post-v1):** an options page storing a custom search URL template containing `%s`,
   used in preference to the default engine when set. Keep out of v1 to preserve the "tiny, no
   storage, no options" character of the original.

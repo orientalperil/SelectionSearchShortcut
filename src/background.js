@@ -5,16 +5,28 @@
  * manifest.json's "background" key, which declares both). No persistent
  * state is kept between command presses.
  *
- * Flow for each keyboard command:
- *   1. Find the active tab in the current window (the "source" tab).
- *   2. Read whatever text is selected in that tab (any frame).
- *   3. If there's a selection, open a new tab immediately to the right of
- *      the source tab - foreground or background depending on the command.
- *   4. Ask the browser's default search engine to render results into that
- *      specific new tab (via the "search" API's tabId option), rather than
- *      building a search URL ourselves.
- *   5. If the source tab belonged to a Chrome tab group, pull the new tab
- *      into that same group so it doesn't visually split the group.
+ * The foreground and background commands use different strategies:
+ *
+ * - Foreground: uses search.query({disposition: "NEW_TAB"}). The browser
+ *   creates the tab and navigates it to the results in one step, so there's
+ *   no separate "new blank tab" moment where the omnibox can get stuck
+ *   focused/selected, and no perceptible delay. The one thing this call
+ *   doesn't give us is placement: disposition: "NEW_TAB" always appends the
+ *   tab at the end of the tab strip (confirmed by testing - this is likely
+ *   exactly why the extension this project clones has that same behavior).
+ *   tabs.move() afterwards recovers the intended position; it only changes
+ *   tab-strip index, not navigation or focus, so it doesn't reintroduce the
+ *   delay or the omnibox artifact - it does cause a brief visible flash at
+ *   the end of the strip before the tab jumps over, which was judged an
+ *   acceptable trade for feeling instant like the browser's own search
+ *   feature (see PLAN.md for the alternatives that were tried and rejected,
+ *   and for what is/isn't actually verified about how Chrome implements its
+ *   own version of this).
+ * - Background: creates an inactive tab ourselves at the target index, then
+ *   calls search.query({tabId}) to load results into it. Because the tab
+ *   is never shown to the user while it's blank/loading, there's no
+ *   omnibox-artifact risk to begin with, and disposition has no
+ *   background/inactive option to borrow from regardless.
  */
 
 const api = typeof browser !== "undefined" ? browser : chrome;
@@ -42,9 +54,11 @@ async function handleCommand({ foreground }) {
     return;
   }
 
-  const newTab = await createAdjacentTab(sourceTab, foreground);
-  await runSearch(selection, newTab.id);
-  await joinSourceTabGroup(sourceTab, newTab);
+  if (foreground) {
+    await searchForeground(sourceTab, selection);
+  } else {
+    await searchBackground(sourceTab, selection);
+  }
 }
 
 async function getActiveTab() {
@@ -122,29 +136,132 @@ function normalize(text) {
 }
 
 /**
- * Creates a new tab in the same window as sourceTab, placed directly to its
- * right (index + 1), instead of at the end of the tab strip.
+ * Foreground command: let the browser create-and-navigate the tab in one
+ * step via search.query({disposition: "NEW_TAB"}), then move it next to the
+ * source tab and into its tab group if any.
  */
-async function createAdjacentTab(sourceTab, active) {
-  return api.tabs.create({
+async function searchForeground(sourceTab, text) {
+  const newTabPromise = waitForNewTabIn(sourceTab.windowId);
+
+  try {
+    await api.search.query({ text, disposition: "NEW_TAB" });
+  } catch (err) {
+    // search.query() itself failed - most likely there's no default search
+    // engine configured at all. We have no engine to fall back to (the
+    // search API never exposes one), so tell the user rather than guessing.
+    const alertTab = await api.tabs.create({
+      url: "about:blank",
+      windowId: sourceTab.windowId,
+      index: sourceTab.index + 1,
+      active: true,
+      openerTabId: sourceTab.id,
+    });
+    await joinSourceTabGroup(sourceTab, alertTab);
+    await showNoSearchEngineAlert(alertTab.id, text);
+    return;
+  }
+
+  const newTab = await newTabPromise;
+  if (!newTab) {
+    // Couldn't identify which tab the browser just created - leave it
+    // wherever the browser put it rather than risk moving the wrong tab.
+    return;
+  }
+  await moveTab(newTab.id, sourceTab.index + 1);
+  await joinSourceTabGroup(sourceTab, newTab);
+}
+
+/**
+ * Background command: create the tab ourselves (inactive, so there's
+ * nothing visible while it loads) at the target index, then load results
+ * into it via search.query({tabId}).
+ */
+async function searchBackground(sourceTab, text) {
+  const newTab = await api.tabs.create({
+    url: "about:blank",
     windowId: sourceTab.windowId,
     index: sourceTab.index + 1,
-    active,
+    active: false,
     openerTabId: sourceTab.id,
   });
+  await runSearch(text, newTab.id);
+  await joinSourceTabGroup(sourceTab, newTab);
+}
+
+/**
+ * Resolves with the first tab created in the given window after this is
+ * called, or null after timeoutMs with nothing matching. Used to identify
+ * the tab search.query({disposition: "NEW_TAB"}) creates internally, since
+ * that call doesn't return the new tab's id itself.
+ */
+function waitForNewTabIn(windowId, timeoutMs = 2000) {
+  return new Promise((resolve) => {
+    let settled = false;
+
+    function finish(tab) {
+      if (settled) return;
+      settled = true;
+      api.tabs.onCreated.removeListener(onCreated);
+      clearTimeout(timer);
+      resolve(tab || null);
+    }
+
+    function onCreated(tab) {
+      if (tab.windowId === windowId) {
+        finish(tab);
+      }
+    }
+
+    api.tabs.onCreated.addListener(onCreated);
+    const timer = setTimeout(() => finish(null), timeoutMs);
+  });
+}
+
+async function moveTab(tabId, index) {
+  try {
+    await api.tabs.move(tabId, { index });
+  } catch (err) {
+    // Non-fatal: leave the tab wherever the browser placed it.
+  }
 }
 
 /**
  * Hands the query to the browser's default search engine, targeting the
- * specific tab we just created. Falls back to a Google search URL if the
- * search API is unavailable or rejects (e.g. no default engine configured).
+ * specific tab we just created. If the search API rejects (most likely: no
+ * default search engine configured), tells the user instead of guessing
+ * one - see showNoSearchEngineAlert().
  */
 async function runSearch(text, tabId) {
   try {
     await api.search.query({ text, tabId });
   } catch (err) {
-    const url = "https://www.google.com/search?q=" + encodeURIComponent(text);
-    await api.tabs.update(tabId, { url });
+    await showNoSearchEngineAlert(tabId, text);
+  }
+}
+
+/**
+ * Injects a plain alert() into the (blank) tab we created, telling the user
+ * their search couldn't run. Deliberately doesn't guess a search engine -
+ * the search API never exposes one, so there's nothing reliable to fall
+ * back to. Needs no extra permission: it's a tab we created ourselves, so
+ * it's never a restricted page the "scripting" permission can't reach.
+ */
+async function showNoSearchEngineAlert(tabId, text) {
+  try {
+    await api.scripting.executeScript({
+      target: { tabId },
+      func: (query) => {
+        alert(
+          "Selection Search Shortcut couldn't run this search: no default " +
+            'search engine is configured in this browser.\n\nQuery: "' +
+            query +
+            '"'
+        );
+      },
+      args: [text],
+    });
+  } catch (err) {
+    // If even this fails, there's nothing more we can do.
   }
 }
 
