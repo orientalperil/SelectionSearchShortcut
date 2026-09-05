@@ -16,13 +16,13 @@
   },
   "permissions": ["activeTab", "scripting", "search"],
   "commands": {
-    "search-selection-foreground": {
+    "1-search-selection-foreground": {
       "suggested_key": {
         "default": "Alt+1"
       },
       "description": "Search selection in a new tab next to this one (switch to it)"
     },
-    "search-selection-background": {
+    "2-search-selection-background": {
       "suggested_key": {
         "default": "Alt+Shift+1"
       },

@@ -22,9 +22,11 @@ const api = typeof browser !== "undefined" ? browser : chrome;
 const MAX_QUERY_LENGTH = 2000;
 
 api.commands.onCommand.addListener((command) => {
-  if (command === "search-selection-foreground") {
+  // The "1-"/"2-" prefixes exist only so Chrome's alphabetically-sorted
+  // chrome://extensions/shortcuts page lists foreground before background.
+  if (command === "1-search-selection-foreground") {
     handleCommand({ foreground: true }).catch(logError);
-  } else if (command === "search-selection-background") {
+  } else if (command === "2-search-selection-background") {
     handleCommand({ foreground: false }).catch(logError);
   }
 });

@@ -108,14 +108,24 @@ Fields:
 
 | Command id | Description shown in the browser's shortcut UI | Suggested default |
 | --- | --- | --- |
-| `search-selection-foreground` | "Search selected text in a new tab to the right (switch to it)" | `Alt+1` |
-| `search-selection-background` | "Search selected text in a new tab to the right (stay here)" | `Alt+Shift+1` |
+| `1-search-selection-foreground` | "Search selected text in a new tab to the right (switch to it)" | `Alt+1` |
+| `2-search-selection-background` | "Search selected text in a new tab to the right (stay here)" | `Alt+Shift+1` |
+
+Note on the `1-`/`2-` prefixes: Chrome's `chrome://extensions/shortcuts` page lists commands in
+alphabetical order by command id, not manifest declaration order. Without a prefix,
+`search-selection-background` sorts before `search-selection-foreground` ("b" < "f"), so
+foreground would always appear second no matter how the manifest orders them. The numeric
+prefix forces the intended reading order.
 
 Notes on defaults:
 
 - Keep the reference's `Alt+1` / `Alt+Shift+1` bindings — familiar and unlikely to clash with
-  page shortcuts, though `Alt+1..9` is tab-switching on some platforms/Linux WMs. Document that
-  in the README and store listing, as the reference does for ChromeOS/macOS.
+  page shortcuts, though `Alt+1..9` is tab-switching (or virtual-desktop-switching, on many
+  Linux window managers) on some platforms. Document that in the README and store listing, as
+  the reference does for ChromeOS/macOS. In practice this means `Alt+1` may arrive with no
+  default binding at all if the OS/WM grabs it first — Chrome silently leaves the command
+  unbound rather than erroring, so this needs to be called out as a "bind it yourself" step,
+  not just a "might conflict" note.
 - Chrome allows at most 4 suggested keys; we use 2.
 - Provide `default` plus `mac` overrides if `Alt` proves awkward on macOS (`Alt` maps to Option
   and can produce dead keys) — evaluate during testing (§9).
