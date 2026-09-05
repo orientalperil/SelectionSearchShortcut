@@ -39,9 +39,8 @@ Additional requirement: ship for **both Chrome and Firefox**, MIT licensed.
 
 ### Naming
 
-Do not reuse the reference extension's name or icon. Working name for the repo:
-**"Selection Search Shortcut"**; store name candidate: *"Search Selection in Next Tab"* —
-descriptive of the actual differentiator. Decide before store submission (see §11).
+Do not reuse the reference extension's name or icon. Chosen name: **"Search Selection
+Shortcut"** (used as the manifest `name`/`short_name` and throughout the repo).
 
 ---
 
