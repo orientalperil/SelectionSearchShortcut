@@ -257,12 +257,23 @@ Fallbacks and checks:
 Both browsers own the remapping UI; we do not build our own key capture in v1.
 
 - Chrome/Edge: `chrome://extensions/shortcuts`. Users can also set scope ("In Chrome" vs "Global").
-- Firefox: `about:addons` → gear → *Manage Extension Shortcuts*.
-- Ship a minimal **options page** whose only job is to explain this and deep-link where possible:
-  Chrome cannot be navigated to `chrome://extensions/shortcuts` from a link (it can from
-  `tabs.create` in the extension's own page — verify), Firefox likewise restricts `about:addons`.
-  Worst case the page shows copy-pasteable URLs plus screenshots. Also state the known conflicts
+  `tabs.create({url: "chrome://extensions/shortcuts"})` from the options page works for getting
+  there with one click (confirmed).
+- Firefox: `commands.openShortcutSettings()` opens the "Manage Extension Shortcuts" dialog
+  directly - this is the correct, supported way to get there, **not**
+  `tabs.create({url: "about:addons"})`. Firefox treats `about:addons` as a privileged page and
+  always refuses an extension navigating to it directly (confirmed - this is by design, not a
+  bug or version quirk, and there's no permission or workaround that changes it). The manual path
+  (`about:addons` → gear icon → *Manage Extension Shortcuts*) still needs stating in the UI as a
+  fallback in case `openShortcutSettings()` itself ever fails.
+- Ship a minimal **options page** with one block per browser, whose only job is to explain this
+  and offer a one-click button using the mechanism above. Also state the known conflicts
   (`Alt+1` = switch to tab 1 in some environments; macOS Option-key dead keys).
+- **Detecting which block/button to show:** don't use `typeof browser !== "undefined"` for this -
+  Chrome shipped a `browser` global (aliasing `chrome`) starting at Chrome 148 (mid-2026), so that
+  check can no longer tell Chrome and Firefox apart and will pick the wrong block. Feature-detect
+  `commands.openShortcutSettings` instead (Firefox-only, confirmed via MDN) - it happens to be
+  exactly the capability the UI needs to branch on anyway.
 - **Firefox-only bonus (optional):** Firefox supports `commands.update()` at runtime, so the
   options page *could* offer real in-page rebinding there. Chrome has no equivalent. Only worth
   doing if the browser UIs prove too hard to find for users; keep it out of v1.

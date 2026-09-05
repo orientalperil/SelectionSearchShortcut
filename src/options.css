@@ -95,6 +95,11 @@ code {
   font-size: 12.5px;
 }
 
+.fallback-note {
+  font-size: 12.5px;
+  margin-top: 8px;
+}
+
 .browser-block {
   margin-bottom: 16px;
 }
