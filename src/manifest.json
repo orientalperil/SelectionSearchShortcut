@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Selection Search Shortcut",
   "short_name": "Selection Search Shortcut",
-  "description": "Keyboard shortcuts that search selected text with your default search engine, opening the results directly next to the current tab (not at the end of the tab strip).",
+  "description": "Keyboard shortcuts that search selected text with your default search engine, opening the results directly next to the current tab.",
   "version": "0.1.0",
   "icons": {
     "16": "icons/icon16.png",
@@ -40,6 +40,9 @@
       "data_collection_permissions": {
         "required": ["none"]
       }
+    },
+    "gecko_android": {
+      "strict_min_version": "142.0"
     }
   }
 }
