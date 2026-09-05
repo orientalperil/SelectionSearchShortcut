@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Search Selection in Next Tab",
+  "short_name": "Selection Search Shortcut",
+  "description": "Keyboard shortcuts that search selected text with your default search engine, opening the results directly next to the current tab (not at the end of the tab strip).",
+  "version": "0.1.0",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["background.js"]
+  },
+  "permissions": ["activeTab", "scripting", "search"],
+  "commands": {
+    "search-selection-foreground": {
+      "suggested_key": {
+        "default": "Alt+1"
+      },
+      "description": "Search selection in a new tab next to this one (switch to it)"
+    },
+    "search-selection-background": {
+      "suggested_key": {
+        "default": "Alt+Shift+1"
+      },
+      "description": "Search selection in a new tab next to this one (stay here)"
+    }
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "{7a762a2c-61d3-415c-8326-df853b803cce}",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  }
+}

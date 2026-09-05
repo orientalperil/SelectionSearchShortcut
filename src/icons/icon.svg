@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4f8cff"/>
+      <stop offset="1" stop-color="#2f5fd6"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="url(#bg)"/>
+
+  <!-- two tabs: current (left, dim) and new (right, bright), with an arrow between -->
+  <rect x="14" y="40" width="38" height="30" rx="6" fill="#ffffff" opacity="0.35"/>
+  <rect x="76" y="34" width="40" height="34" rx="7" fill="#ffffff"/>
+
+  <!-- arrow from current tab to new tab -->
+  <path d="M54 55 H70" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+  <path d="M64 47 L74 55 L64 63" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- magnifying glass over the new tab -->
+  <circle cx="96" cy="82" r="16" fill="none" stroke="#2f5fd6" stroke-width="8"/>
+  <path d="M107 93 L119 105" stroke="#2f5fd6" stroke-width="8" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,121 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #555555;
+  --border: #dddddd;
+  --accent: #2f5fd6;
+  --code-bg: #f2f2f2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1f22;
+    --fg: #f0f0f0;
+    --muted: #b5b5b5;
+    --border: #3a3b3e;
+    --accent: #7aa2ff;
+    --code-bg: #2b2c2f;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 24px 32px 48px;
+  max-width: 640px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+header h1 {
+  font-size: 18px;
+  margin: 0;
+}
+
+h2 {
+  font-size: 15px;
+  margin: 28px 0 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+h3 {
+  font-size: 13px;
+  margin: 16px 0 4px;
+}
+
+p {
+  color: var(--muted);
+}
+
+table.shortcuts {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+
+table.shortcuts td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+table.shortcuts td:first-child {
+  white-space: nowrap;
+  width: 1%;
+}
+
+kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+code {
+  background: var(--code-bg);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 12.5px;
+}
+
+.browser-block {
+  margin-bottom: 16px;
+}
+
+button {
+  appearance: none;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+ul {
+  color: var(--muted);
+  padding-left: 20px;
+}

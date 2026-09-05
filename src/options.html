@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Selection Search Shortcut - Options</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <header>
+    <img src="icons/icon48.png" alt="" width="32" height="32" />
+    <h1>Selection Search Shortcut</h1>
+  </header>
+
+  <section>
+    <h2>Shortcuts</h2>
+    <table class="shortcuts">
+      <tbody>
+        <tr>
+          <td><kbd>Alt</kbd> + <kbd>1</kbd></td>
+          <td>Search the selected text in a new tab <strong>next to</strong> this one, and switch to it.</td>
+        </tr>
+        <tr>
+          <td><kbd>Alt</kbd> + <kbd>Shift</kbd> + <kbd>1</kbd></td>
+          <td>Same, but stay on the current tab.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      Search results always come from your browser's <strong>default search engine</strong>,
+      and the new tab always opens directly to the right of the tab you're on -
+      not at the end of the tab strip.
+    </p>
+  </section>
+
+  <section>
+    <h2>Changing the shortcuts</h2>
+    <p>Keyboard shortcuts are managed by the browser itself, not by this extension.</p>
+
+    <div class="browser-block" id="chrome-block">
+      <h3>Chrome / Edge</h3>
+      <p>Open <code>chrome://extensions/shortcuts</code> and find "Search Selection in Next Tab".</p>
+      <button id="open-chrome-shortcuts" type="button">Open shortcut settings</button>
+    </div>
+
+    <div class="browser-block" id="firefox-block">
+      <h3>Firefox</h3>
+      <p>
+        Open <code>about:addons</code>, click the gear icon in the top-right corner, choose
+        <strong>Manage Extension Shortcuts</strong>, then find "Search Selection in Next Tab".
+      </p>
+      <button id="open-firefox-addons" type="button">Open about:addons</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Known conflicts</h2>
+    <ul>
+      <li>
+        On some Linux window managers and on ChromeOS, <kbd>Alt</kbd>+<kbd>1</kbd> switches to
+        the first pinned tab. If that happens, rebind the shortcut above.
+      </li>
+      <li>
+        On macOS, <kbd>Alt</kbd> is the Option key and can produce accented characters in some
+        layouts. Rebind if it interferes with typing.
+      </li>
+    </ul>
+  </section>
+
+  <script src="options.js"></script>
+</body>
+</html>
