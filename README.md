@@ -60,9 +60,12 @@ Produces `dist/selection-search-shortcut-chrome-<version>.zip` and
 2. Inject a small function into every frame of that tab to read
    `window.getSelection()` (falling back to the focused `<input>`/`<textarea>`
    selection range).
-3. Create a new tab with `index: sourceTab.index + 1` — this is what puts the
-   result tab next to the source tab instead of at the end of the strip —
-   and `active` set according to which shortcut was pressed.
+3. Create a new tab just to the right of the source tab instead of at the end
+   of the strip, with `active` set according to which shortcut was pressed.
+   Firing the command repeatedly from the same tab chains each result to the
+   right of the previous one (by walking past tabs already opened from the
+   source tab), the same way the browser's built-in "Search for …" menu item
+   behaves.
 4. Call `search.query({ text, tabId })`, which asks the browser to run the
    query through the user's **default search engine** directly into that new
    tab, rather than hard-coding a search-engine URL.

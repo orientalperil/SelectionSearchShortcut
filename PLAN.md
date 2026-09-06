@@ -183,13 +183,16 @@ Edge cases to handle explicitly:
   automatically, which visually breaks the group. After creation, read `sourceTab.groupId` and,
   if it is a real group, call `tabs.group({groupId, tabIds})`. Guard the call behind a feature
   check so the same code is a no-op on Firefox.
-- **Repeated presses.** Pressing the shortcut twice from the same source tab inserts the second
-  result *between* the source tab and the first result, i.e. newest-adjacent. The alternative is
-  "chain after the most recently opened sibling" (Firefox's `insertRelatedAfterCurrent` feel).
-  **Decision: v1 uses the simple rule** (always `source.index + 1`) — stateless, predictable, and
-  correct after the user moves tabs around. Revisit only if it feels wrong in daily use; if so,
-  implement chaining as bounded per-source-tab state in the background script (`Map<sourceTabId,
-  {lastIndex, timestamp}>`, invalidated on tab move/close and after a timeout).
+- **Repeated presses.** Firing the command several times without leaving the source tab (most
+  obviously the background command, which never steals focus) should chain each new tab to the
+  right of the previous result, matching the browser's own "Search for ..." context-menu item.
+  The naive `source.index + 1` instead wedges each new result *between* the source tab and the
+  earlier results, which is backwards. **Decision: chain, but statelessly** — `getInsertionIndex()`
+  starts at `source.index + 1` and walks right over each contiguous tab whose `openerTabId` is the
+  source tab, stopping at the first unrelated tab (so it never jumps a tab the user parked there).
+  No `Map<sourceTabId, …>` or timers; the tab strip itself is the state, so it stays correct after
+  the user moves or closes tabs. With nothing opened from the source tab yet it degrades to plain
+  `source.index + 1`.
 - **Foreground vs background.** Different code paths per §2: foreground uses
   `search.query({disposition: "NEW_TAB"})` (browser creates+activates it, we just reposition
   afterwards with `tabs.move`); background creates the tab itself with `active: false` up front.
@@ -324,7 +327,8 @@ minimum, macOS/Windows if available:
   shows default-engine results for the exact selection.
 - Same with the background command → new tab in the same slot, source tab **stays** focused and
   keeps its selection.
-- Press background twice → both results sit to the right of the source tab, newest first.
+- Press background twice → both results sit to the right of the source tab, in the order opened
+  (second result to the right of the first), matching the native context-menu search item.
 - Selection inside an iframe (e.g. an embedded CodePen/YouTube description) → works.
 - Selection in a `<textarea>`/`<input>` → works (getSelection may be empty here; if so, also read
   `activeElement.selectionStart/End` in the injected function — add if testing shows a gap).
@@ -377,8 +381,8 @@ would cost more than they return here. Revisit if the extension grows options.
 ## 12. Open decisions
 
 1. **Final extension name** and icon direction. (Blocking store submission only.)
-2. **Repeated-press behavior** — simple `index + 1` (planned default) vs. chaining. Revisit after
-   dogfooding.
+2. **Repeated-press behavior** — resolved: stateless chaining via `getInsertionIndex()` (§4),
+   matching the native context-menu search item.
 3. **PDF support scope** — decided by the §5 spike; may end up Chrome-limited or Firefox-limited.
 4. **Options page in v1?** Recommended yes, but only as static instructions; no settings.
 5. Whether to also expose a **context-menu item** — falls out for free if the PDF fallback is

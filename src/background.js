@@ -141,6 +141,7 @@ function normalize(text) {
  * source tab and into its tab group if any.
  */
 async function searchForeground(sourceTab, text) {
+  const targetIndex = await getInsertionIndex(sourceTab);
   const newTabPromise = waitForNewTabIn(sourceTab.windowId);
 
   try {
@@ -152,7 +153,7 @@ async function searchForeground(sourceTab, text) {
     const alertTab = await api.tabs.create({
       url: "about:blank",
       windowId: sourceTab.windowId,
-      index: sourceTab.index + 1,
+      index: targetIndex,
       active: true,
       openerTabId: sourceTab.id,
     });
@@ -167,7 +168,7 @@ async function searchForeground(sourceTab, text) {
     // wherever the browser put it rather than risk moving the wrong tab.
     return;
   }
-  await moveTab(newTab.id, sourceTab.index + 1);
+  await moveTab(newTab.id, targetIndex);
   await joinSourceTabGroup(sourceTab, newTab);
 }
 
@@ -177,10 +178,11 @@ async function searchForeground(sourceTab, text) {
  * into it via search.query({tabId}).
  */
 async function searchBackground(sourceTab, text) {
+  const targetIndex = await getInsertionIndex(sourceTab);
   const newTab = await api.tabs.create({
     url: "about:blank",
     windowId: sourceTab.windowId,
-    index: sourceTab.index + 1,
+    index: targetIndex,
     active: false,
     openerTabId: sourceTab.id,
   });
@@ -215,6 +217,51 @@ function waitForNewTabIn(windowId, timeoutMs = 2000) {
     api.tabs.onCreated.addListener(onCreated);
     const timer = setTimeout(() => finish(null), timeoutMs);
   });
+}
+
+/**
+ * Where to insert the new tab.
+ *
+ * Base position is immediately to the right of the source tab. But when the
+ * user fires the command several times without leaving the source tab (most
+ * obviously the background command, which never steals focus), each new tab
+ * should land to the right of the previous result, not wedge itself between
+ * the source tab and the earlier results. That's the behavior of the
+ * browser's own "Search for ..." context-menu item.
+ *
+ * To get it without keeping any state between presses: start just after the
+ * source tab and walk right, stepping over each contiguous tab that was
+ * opened from this same source tab (openerTabId). Stop at the first tab that
+ * wasn't - so we never jump over an unrelated tab the user has sitting
+ * there. With nothing opened from this tab yet, this is just
+ * sourceTab.index + 1.
+ */
+async function getInsertionIndex(sourceTab) {
+  if (sourceTab.id === undefined) {
+    return sourceTab.index + 1;
+  }
+
+  let tabs;
+  try {
+    tabs = await api.tabs.query({ windowId: sourceTab.windowId });
+  } catch (err) {
+    return sourceTab.index + 1;
+  }
+
+  tabs.sort((a, b) => a.index - b.index);
+
+  let index = sourceTab.index + 1;
+  for (const tab of tabs) {
+    if (tab.index < index) {
+      continue;
+    }
+    if (tab.openerTabId === sourceTab.id) {
+      index = tab.index + 1;
+    } else {
+      break;
+    }
+  }
+  return index;
 }
 
 async function moveTab(tabId, index) {
